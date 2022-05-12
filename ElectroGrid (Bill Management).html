@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="./ElectroGrid (Bill Management).css">
+
+    <script>
+      window.console = window.console || function (t) {};
+    </script>
+
+    <script>
+      if (document.location.search.match(/type=embed/gi)) {
+        window.parent.postMessage("resize", "*");
+      }
+    </script>
+  </head>
+
+  <body translate="no">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4">
+          <h3>Add user bill details</h3>
+          <form id="addUser" action="">
+            <div class="form-group">
+              <input class="form-control" type="text" name="nic" placeholder="Enter the NIC" required/>
+            </div>
+            <div class="form-group">
+              <input class="form-control" type="number" name="price" placeholder="Enter the Price" required/>
+            </div>
+            <div class="form-group">
+              <input class="form-control" type="date" name="date" placeholder="Enter the Date" required/>
+            </div>
+            <div class="form-group">
+              <input class="form-control" type="text" name="meterReader" placeholder=" Enter the Meter Reader" required/>
+            </div>
+            <button class="button-52" type="submit">SUBMIT</button>
+          </form>
+        </div>
+        <div class="col-md-8">
+          <h3>User Bill Details</h3>
+          <table id="userTable" class="table table-striped">
+            <tr>
+              <th>NIC</th>
+              <th>Price</th>
+              <th>Date</th>
+              <th>Meter Reader</th>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- Modal -->
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <h4 class="modal-title" id="myModalLabel">Update bill details</h4>
+          </div>
+          <div class="modal-body"></div>
+          <div class="modal-footer"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script id="rendered-js">
+
+      var users = [];
+
+      $(document).ready(function () {
+        var settings = {
+          url: "http://localhost:8050/billservice/",
+          method: "GET",
+          timeout: 0,
+        };
+
+        $.ajax(settings).done(function (response) {
+          users = response;
+          $.each(users, function (i, user) {
+            appendToUsrTable(user);
+          });
+        });
+      });
+
+      $("form").submit(function (e) {
+        e.preventDefault();
+      });
+
+      $("form#addUser").submit(function () {
+        var user = {};
+        var nicInput = $(this).find("input[name=nic]");
+        var priceInput = $('input[name="price"]').val().trim();
+        var dateInput = $('input[name="date"]').val().trim();
+        var meterReaderInput = $('input[name="meterReader"]').val().trim();
+        if (nicInput && priceInput && dateInput && meterReaderInput) {
+          $(this)
+            .serializeArray()
+            .map(function (data) {
+              user[data.name] = data.value;
+            });
+          var lastUser = users[Object.keys(users).sort().pop()];
+          user.id = lastUser.id + 1;
+
+          addUser(user);
+        } else {
+          alert("All fields must have a valid value.");
+        }
+      });
+
+      function addUser(user) {
+        
+        var settings = {
+          url: "http://localhost:8050/billservice/",
+          method: "POST",
+          timeout: 0,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          data: JSON.stringify(user),
+        };
+
+        $.ajax(settings).done(function (response) {
+          $("form#addUser").trigger("reset");
+        });
+
+        users.push(user);
+        appendToUsrTable(user);
+
+        setTimeout(function () {
+          stopConfetti();
+        }, 1000);
+      }
+
+      function editUser(id) {
+        users.forEach(function (user, i) {
+          if (user.id == id) {
+            $(".modal-body").empty().append(`
+                <form id="updateUser" action="">
+                    <label for="name">NIC</label>
+                    <input class="form-control" type="text" name="nic" value="${user.nic}"/>
+                    <label for="name">Price</label>
+                    <input class="form-control" type="number" name="price" value="${user.price}"/>
+                    <label for="address">Date</label>
+                    <input class="form-control" type="date" name="date" value="${user.date}"/>
+                    <label for="age">Meter Reader</label>
+                    <input class="form-control" type="text" name="meterReader" value="${user.meterReader}"/>
+            `);
+            $(".modal-footer").empty().append(`
+                    <button type="button" type="submit" class="btn btn-success" onClick="updateUser(${id})">Save changes</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </form>
+            `);
+          }
+        });
+      }
+
+      function deleteUser(id) {
+        var action = confirm("Are you sure you want to delete this user?");
+        var msg = "User bill details deleted successfully!";
+        users.forEach(function (user, i) {
+          if (user.id == id && action != false) {
+            var settings = {
+              url: `http://localhost:8050/billservice/${user.id}`,
+              method: "DELETE",
+              timeout: 0,
+            };
+
+            $.ajax(settings).done(function (response) {});
+
+            users.splice(i, 1);
+            $("#userTable #user-" + user.id).remove();
+            flashMessage(msg);
+          }
+        });
+      }
+
+      function updateUser(id) {
+        var msg = "User updated successfully!";
+        var user = {};
+        user.id = id;
+        users.forEach(function (user, i) {
+          if (user.id == id) {
+            $("#updateUser")
+              .children("input")
+              .each(function () {
+                var value = $(this).val();
+                var attr = $(this).attr("name");
+                if (attr == "nic") {
+                  user.nic = value;
+                } else if (attr == "price") {
+                  user.price = value;
+                } else if (attr == "date") {
+                  user.date = value;
+                } else if (attr == "meterReader") {
+                  user.meterReader = value;
+                }
+              });
+
+            var settings = {
+              url: `http://localhost:8050/billservice/${user.id}`,
+              method: "PUT",
+              timeout: 0,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              data: JSON.stringify(user),
+            };
+
+            $.ajax(settings).done(function (response) {});
+
+            users[i] = user;
+            $("#userTable #user-" + user.id).remove();
+            appendToUsrTable(user);
+
+            $(".modal").modal("toggle");
+            flashMessage(msg);
+          }
+        });
+      }
+
+      function flashMessage(msg) {
+        $(".flashMsg").remove();
+        $(".row").prepend(`
+        <div class="col-sm-12"><div class="flashMsg alert alert-success alert-dismissible fade in" role="alert"> <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button> <strong>${msg}</strong></div></div>
+    `);
+      }
+
+      function appendToUsrTable(user) {
+        $("#userTable > tbody:last-child").append(`
+        <tr id="user-${user.id}">
+            <td class="userData" name="nic">${user.nic}</td>
+            '<td class="userData" name="price">${user.price}</td>
+            '<td class="city" name="date">${user.date}</td>
+            '<td id="tdNumber" class="userData" name="meterReader">${user.meterReader}</td>
+            '<td align="center">
+                <button class="button-53" onClick="editUser(${user.id})" data-toggle="modal" data-target="#myModal")">EDIT</button>
+            </td>
+            <td align="center">
+                <button class="button-54" onClick="deleteUser(${user.id})">DELETE</button>
+            </td>
+        </tr>
+    `);
+      }
+    </script>
+  </body>
+</html>
